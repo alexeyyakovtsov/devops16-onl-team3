@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# --- TASK 2 ---
+function chekUsernameLimit() {
+    local userName="$1"  # Receive the userName as an argument
+
+    if [ "${#userName}" -gt "10" ]; then
+        echo "Your username contains more than 10 characters. Please enter less than 10 characters"
+        exit 1
+    fi
+}
+
 # Display existing active users
 active_users=$(awk -F: '($7 != "/usr/sbin/nologin" && $7 != "/bin/false") { print $1 }' /etc/passwd)
 active_users_count=$(echo "$active_users" | wc -l)
@@ -49,6 +59,14 @@ if [[ $create_new_user =~ ^[Yy]$ ]]; then
     # Prompt for username
     read -p "Enter username: " username
 
+    # Show string length
+    string_length=${#username}
+    echo "------"
+    echo "The length of the string is: $string_length"
+    # Check the username length
+    chekUsernameLimit "$username"
+    echo "------"
+
     # Prompt for password
     read -s -p "Enter password: " password
     echo
@@ -72,6 +90,10 @@ if [[ $create_new_user =~ ^[Yy]$ ]]; then
     fi
 
     echo "User $username created successfully."
+    echo "------------"
+    returnLength
+    echo "------------"
+fi
 
 # Grant SSH access to the user
 read -p "Grant SSH access to the user? [Y/n]: " grant_ssh_access
@@ -90,26 +112,23 @@ fi
 read -p "Remove a user? [Y/n]: " remove_user
 
 if [[ $remove_user =~ ^[Yy]$ ]]; then
-    # Prompt for username
-    read -p "Enter username to remove: " username
-
-    # Prompt for username to remove from SSH configuration
-    read -p "Enter the username to remove from SSH configuration: " username
+    # Prompt for username to remove
+    read -p "Enter username to remove: " username_to_remove
 
     # Remove SSH permission configuration from sshd_config file
-    sudo sed -i "/AllowUsers.*$username/d" /etc/ssh/sshd_config
+    sudo sed -i "/AllowUsers.*$username_to_remove/d" /etc/ssh/sshd_config
     sudo service ssh restart
 
-    echo "User $username removed from SSH configuration."
+    echo "User $username_to_remove removed from SSH configuration."
 
     # Remove user's home directory
-    read -p "Remove user $username's home directory? [Y/n]: " remove_home_dir
+    read -p "Remove user $username_to_remove's home directory? [Y/n]: " remove_home_dir
     if [[ $remove_home_dir =~ ^[Yy]$ ]]; then
-        sudo userdel -r $username
-        echo "Home directory for user $username removed."
+        sudo userdel -r $username_to_remove
+        echo "Home directory for user $username_to_remove removed."
     fi
 
-    echo "User $username removed successfully."
+    echo "User $username_to_remove removed successfully."
 else
     echo "No user removed."
 fi
