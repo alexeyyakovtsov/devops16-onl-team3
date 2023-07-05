@@ -137,8 +137,39 @@ function removeUser() {
 #        sudo awk -F: '($2 == "!" || $2 == "*") { print $1 }' /etc/shadow | column
 #}
 
+#help function example
+Help() {
+  case $1 in
+    "create")
+       # Display Help
+       echo "Creates user with password and custom directory"
+       echo
+       echo "Syntax: create -username <username> -password <password> [-directory directory] [-enabled] [-ssh_access]"
+       echo "-username New created user name"
+       echo "-password New created user password"
+       echo "-directory New created user home directory"
+       echo "-enable Is user enabled"
+       echo "-ssh_access Is ssh access enabled"
+       echo
+     ;;
+    "remove")
+       # Display Help
+       echo "Removes user with username"
+       echo
+       echo "Syntax: remove -username <username>"
+       echo "-username New created user name"
+       echo
+     ;;
+  esac
+}
+
 command=$1
 : "${command:?Missing command}"
+
+if [[ $2 = "-h" ]]; then
+   Help $command
+   exit;
+fi
 
 args=( "$@" )
 # shellcheck disable=SC2184
