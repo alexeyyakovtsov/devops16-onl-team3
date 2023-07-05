@@ -10,125 +10,191 @@ function chekUsernameLimit() {
     fi
 }
 
-# Display existing active users
-active_users=$(awk -F: '($7 != "/usr/sbin/nologin" && $7 != "/bin/false") { print $1 }' /etc/passwd)
-active_users_count=$(echo "$active_users" | wc -l)
-echo "Existing active users:"
-if [ "$active_users_count" -eq 0 ]; then
-    echo "No active users found."
-else
-    awk -F: '($7 != "/usr/sbin/nologin" && $7 != "/bin/false") { print NR".", $1 }' /etc/passwd | column
-fi
+function createUser() {
+        username=$1
+        password=$2
+        directory=$3
+        ssh_access=$4
+        enable=$5
+        # Prompt for username
+        if [ -z "${username}" ]; then
+          read -p "Enter username: " username
+        fi
 
-# Prompt for option to view disabled accounts
-read -p "View list of disabled user accounts? [Y/n]: " view_disabled
+        # Show string length
+        string_length=${#username}
+        echo "------"
+        echo "The length of the string is: $string_length"
+        # Check the username length
+        chekUsernameLimit "$username"
+        echo "------"
 
-# Check if user wants to view disabled accounts
-if [[ $view_disabled =~ ^[Yy]$ ]]; then
-    # Request root password
-    sudo echo "Requesting root password to view disabled accounts..."
+        # Prompt for password
+        if [ -z "${password}" ]; then
+          read -s -p "Enter password: " password
+          echo
+        fi
 
-    # Display disabled user accounts
-    echo "Disabled user accounts:"
-    sudo awk -F: '($2 == "!" || $2 == "*") { print $1 }' /etc/shadow | column
-fi
+        if [ -z "${ssl_access}" ]; then
+          ssh_access=false
+        fi
 
-# Prompt for account lock
-read -p "Do you want to lock a user account? [Y/n]: " lock_account
+        if [ -z "${enable}" ]; then
+          enable=false
+        fi
 
-if [[ $lock_account =~ ^[Yy]$ ]]; then
-    # Prompt for username
-    read -p "Enter the username to lock: " username
+        if [ -z "${directory}" ]; then
+          read -p "Enter home directory [/home/$username]: " directory
+        fi
 
-    # Check if user exists
-    if id "$username" >/dev/null 2>&1; then
-        # Lock user account
-        sudo passwd -l $username
-        echo "User account $username locked."
-    else
-        echo "User account $username does not exist."
-    fi
-else
-    echo "No user accounts locked."
-fi
+        if [ -z "${directory}" ]; then
+          directory="/home/username"
+        fi
 
-# Prompt to create a new user
-read -p "Create a new user? [Y/n]: " create_new_user
+        # Create user with password
+#        sudo useradd -d $directory -m -p $(echo "$password" | openssl passwd -1 -stdin) $username
 
-if [[ $create_new_user =~ ^[Yy]$ ]]; then
-    # Prompt for username
-    read -p "Enter username: " username
+        # Prompt for additional user details
+#        read -p "Enter full name: " full_name
+#        read -p "Enter description: " description
 
-    # Show string length
-    string_length=${#username}
-    echo "------"
-    echo "The length of the string is: $string_length"
-    # Check the username length
-    chekUsernameLimit "$username"
-    echo "------"
+        # Set additional user details
+#        sudo chfn -f "$full_name" -r "$description" $username
 
-    # Prompt for password
-    read -s -p "Enter password: " password
-    echo
+        echo "User $username created successfully."
+  echo "$@"
+}
 
-    # Create user with password
-    sudo useradd -m -p $(echo "$password" | openssl passwd -1 -stdin) $username
+function lockUser() {
+        username=$1
+        # Prompt for username
+        if [ -z "${username}" ]; then
+          read -p "Enter the username to lock: " username
+        fi
 
-    # Prompt for additional user details
-    read -p "Enter full name: " full_name
-    read -p "Enter description: " description
+        # Check if user exists
+        if id "$username" >/dev/null 2>&1; then
+            # Lock user account
+            sudo passwd -l $username
+            echo "User account $username locked."
+        else
+            echo "User account $username does not exist."
+        fi
+}
 
-    # Set additional user details
-    sudo chfn -f "$full_name" -r "$description" $username
+function grantSshAccess() {
+        # Prompt for SSH permission configuration
+        read -p "Enter SSH permission configuration (e.g., 'AllowUsers username'): " ssh_config
 
-    # Create separate directory for the user
-    read -p "Create a separate directory for the user? [Y/n]: " create_directory
-    if [[ $create_directory =~ ^[Yy]$ ]]; then
-        sudo mkdir /home/$username
-        sudo chown $username:$username /home/$username
-        echo "Separate directory created for user $username."
-    fi
+        # Add SSH permission configuration to sshd_config file
+        echo "$ssh_config" | sudo tee -a /etc/ssh/sshd_config >/dev/null
+        sudo service ssh restart
 
-    echo "User $username created successfully."
-    echo "------------"
-    returnLength
-    echo "------------"
-fi
+        echo "SSH access granted according to the provided configuration."
+}
 
-# Grant SSH access to the user
-read -p "Grant SSH access to the user? [Y/n]: " grant_ssh_access
-if [[ $grant_ssh_access =~ ^[Yy]$ ]]; then
-    # Prompt for SSH permission configuration
-    read -p "Enter SSH permission configuration (e.g., 'AllowUsers username'): " ssh_config
+function removeUser() {
+        username_to_remove=$1
+        # Prompt for username
+        if [ -z "${username_to_remove}" ]; then
+          read -p "Enter username to remove: " username_to_remove
+        fi
 
-    # Add SSH permission configuration to sshd_config file
-    echo "$ssh_config" | sudo tee -a /etc/ssh/sshd_config >/dev/null
-    sudo service ssh restart
+        # Remove SSH permission configuration from sshd_config file
+        sudo sed -i "/AllowUsers.*$username_to_remove/d" /etc/ssh/sshd_config
+        sudo service ssh restart
 
-    echo "SSH access granted according to the provided configuration."
-fi
+        echo "User $username_to_remove removed from SSH configuration."
 
-# Prompt to remove a user
-read -p "Remove a user? [Y/n]: " remove_user
+        # Remove user's home directory
+        read -p "Remove user $username_to_remove's home directory? [Y/n]: " remove_home_dir
+        if [[ $remove_home_dir =~ ^[Yy]$ ]]; then
+            sudo userdel -r $username_to_remove
+            echo "Home directory for user $username_to_remove removed."
+        fi
 
-if [[ $remove_user =~ ^[Yy]$ ]]; then
-    # Prompt for username to remove
-    read -p "Enter username to remove: " username_to_remove
+        echo "User $username_to_remove removed successfully."
+}
 
-    # Remove SSH permission configuration from sshd_config file
-    sudo sed -i "/AllowUsers.*$username_to_remove/d" /etc/ssh/sshd_config
-    sudo service ssh restart
+#function viewActiveUsers() {
+#    # Display existing active users
+#    active_users=$(awk -F: '($7 != "/usr/sbin/nologin" && $7 != "/bin/false") { print $1 }' /etc/passwd)
+#    active_users_count=$(echo "$active_users" | wc -l)
+#    echo "Existing active users:"
+#    if [ "$active_users_count" -eq 0 ]; then
+#        echo "No active users found."
+#    else
+#        awk -F: '($7 != "/usr/sbin/nologin" && $7 != "/bin/false") { print NR".", $1 }' /etc/passwd | column
+#    fi
+#}
 
-    echo "User $username_to_remove removed from SSH configuration."
+#function viewDisabledUsers() {
+#        # Request root password
+#        sudo echo "Requesting root password to view disabled accounts..."
+#
+#        # Display disabled user accounts
+#        echo "Disabled user accounts:"
+#        sudo awk -F: '($2 == "!" || $2 == "*") { print $1 }' /etc/shadow | column
+#}
 
-    # Remove user's home directory
-    read -p "Remove user $username_to_remove's home directory? [Y/n]: " remove_home_dir
-    if [[ $remove_home_dir =~ ^[Yy]$ ]]; then
-        sudo userdel -r $username_to_remove
-        echo "Home directory for user $username_to_remove removed."
-    fi
+command=$1
+: "${command:?Missing command}"
 
-    echo "User $username_to_remove removed successfully."
-else
-    echo "No user removed."
+args=( "$@" )
+# shellcheck disable=SC2184
+unset args[0]
+args_len=${#args[@]}
+
+if [[ $1 = "create" ]]; then
+    for (( i=0; i<$args_len; i++ )) ; do
+      if [[ ${args[$i]} = "-username" ]]; then
+        username=${args[$i + 1]}
+      fi
+
+      if [[ ${args[$i]} = "-password" ]]; then
+        password=${args[$i + 1]}
+      fi
+
+      if [[ ${args[$i]} = "-directory" ]]; then
+        directory=${args[$i + 1]}
+      fi
+
+      if [[ ${args[$i]} = "-ssh_access" ]]; then
+        ssh_access=true
+      fi
+
+      if [[ ${args[$i]} = "-enable" ]]; then
+        enable=true
+      fi
+    done
+
+    createUser $username $password $directory $ssh_access $enable
+elif [[ $1 = "lock" ]]; then
+    for (( i=0; i<$args_len; i++ )) ; do
+      if [[ ${args[$i]} = "-username" ]]; then
+        username=${args[$i + 1]}
+      fi
+    done
+
+    lockUser $username
+
+elif [[ $1 = "grant-ssh" ]]; then
+    for (( i=0; i<$args_len; i++ )) ; do
+      if [[ ${args[$i]} = "-username" ]]; then
+        username=${args[$i + 1]}
+      fi
+    done
+    grantSshAccess $username
+elif [[ $1 = "remove" ]]; then
+    for (( i=0; i<$args_len; i++ )) ; do
+      if [[ ${args[$i]} = "-username" ]]; then
+        username=${args[$i + 1]}
+      fi
+    done
+    grantSshAccess $username
+    removeUser $username
+#elif [[ $1 = "ls-active" ]]; then
+#    viewActiveUsers $args
+#elif [[ $1 = "ls-disabled" ]]; then
+#    viewDisabledUsers $args
 fi
