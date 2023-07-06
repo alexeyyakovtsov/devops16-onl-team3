@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- TASK 2 ---
-function chekUsernameLimit() {
+function chekUserLimit() {
     local userName="$1"  # Receive the userName as an argument
 
     if [ "${#userName}" -gt "10" ]; then
