@@ -167,6 +167,13 @@ Help() {
   esac
 }
 
+args=( "$@" )
+
+# shellcheck disable=SC2128
+# shellcheck disable=SC2154
+echo "command arguments: ${args[*]}"
+echo
+
 if [[ $1 = "-h" ]]; then
    Help
    exit;
@@ -180,7 +187,6 @@ if [[ $2 = "-h" ]]; then
    exit;
 fi
 
-args=( "$@" )
 # shellcheck disable=SC2184
 unset args[0]
 args_len=${#args[@]}
