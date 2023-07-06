@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- TASK 2 ---
-function chekUserLimit() {
+function chekUsernameLengthLimit() {
     local userName="$1"  # Receive the userName as an argument
 
     if [ "${#userName}" -gt "10" ]; then
@@ -26,7 +26,7 @@ function createUser() {
         echo "------"
         echo "The length of the string is: $string_length"
         # Check the username length
-        chekUsernameLimit "$username"
+        chekUsernameLengthLimit "$username"
         echo "------"
 
         # Prompt for password
