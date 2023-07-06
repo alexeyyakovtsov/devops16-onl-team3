@@ -139,6 +139,10 @@ function removeUser() {
 
 #help function example
 Help() {
+  if [[ -z $1 ]]; then
+    echo "Enter command and options: <create|remove|lock|grant-ssh> [options]"
+    exit;
+  fi
   case $1 in
     "create")
        # Display Help
@@ -162,6 +166,11 @@ Help() {
      ;;
   esac
 }
+
+if [[ $1 = "-h" ]]; then
+   Help
+   exit;
+fi
 
 command=$1
 : "${command:?Missing command}"
